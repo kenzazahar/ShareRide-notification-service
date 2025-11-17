@@ -1,5 +1,6 @@
 package com.taxishare.notification_service.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxishare.notification_service.model.NotificationType;
 import com.taxishare.notification_service.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -13,51 +14,72 @@ import org.springframework.stereotype.Service;
 public class SystemEventConsumer {
 
     private final NotificationService notificationService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @KafkaListener(topics = "system.alert", groupId = "notification-service-group")
     public void handleSystemAlert(String message) {
         log.info("🔔 Event reçu [system.alert]: {}", message);
 
-        notificationService.sendNotification(
-                "user123",
-                "Alerte système",
-                "Maintenance programmée ce soir de 23h à 2h",
-                NotificationType.SYSTEM_ALERT,
-                null
-        );
+        try {
+            var event = objectMapper.readTree(message);
+            String userId = event.get("userId").asText();
+            String alertMessage = event.get("message").asText();
+
+            notificationService.sendNotification(
+                    userId,
+                    "Alerte système",
+                    alertMessage,
+                    NotificationType.SYSTEM_ALERT,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("❌ Erreur parsing JSON pour system.alert: {}", e.getMessage());
+        }
     }
 
     @KafkaListener(topics = "driver.verified", groupId = "notification-service-group")
     public void handleDriverVerified(String message) {
         log.info("🔔 Event reçu [driver.verified]: {}", message);
 
-        notificationService.sendNotification(
-                "driver789",
-                "Compte vérifié ✓",
-                "Félicitations ! Votre compte conducteur a été vérifié",
-                NotificationType.DRIVER_VERIFIED,
-                null
-        );
+        try {
+            var event = objectMapper.readTree(message);
+            String driverId = event.get("driverId").asText();
+
+            notificationService.sendNotification(
+                    driverId,
+                    "Compte vérifié ✓",
+                    "Félicitations ! Votre compte conducteur a été vérifié",
+                    NotificationType.DRIVER_VERIFIED,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("❌ Erreur parsing JSON pour driver.verified: {}", e.getMessage());
+        }
     }
 
     @KafkaListener(topics = "user.updated", groupId = "notification-service-group")
     public void handleUserUpdated(String message) {
         log.info("🔔 Event reçu [user.updated]: {}", message);
 
-        notificationService.sendNotification(
-                "user123",
-                "Profil mis à jour",
-                "Vos informations ont été mises à jour avec succès",
-                NotificationType.USER_UPDATED,
-                null
-        );
+        try {
+            var event = objectMapper.readTree(message);
+            String userId = event.get("userId").asText();
+
+            notificationService.sendNotification(
+                    userId,
+                    "Profil mis à jour",
+                    "Vos informations ont été mises à jour avec succès",
+                    NotificationType.USER_UPDATED,
+                    null
+            );
+        } catch (Exception e) {
+            log.error("❌ Erreur parsing JSON pour user.updated: {}", e.getMessage());
+        }
     }
 
     @KafkaListener(topics = "taxi.location.updated", groupId = "notification-service-group")
     public void handleTaxiLocationUpdated(String message) {
         log.debug("📍 Position taxi mise à jour: {}", message);
-        // Note: Ce topic génère beaucoup de messages
-        // On ne crée pas de notification, juste un log
-        // Le frontend se connecte directement via WebSocket pour le tracking
+        // Pas de notification créée
     }
 }
